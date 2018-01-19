@@ -1,23 +1,30 @@
 import {expect} from 'chai';
 
-// import {tester} from 'sheep';
-// import td from 'testdouble';
+import {tester} from 'sheep';
 
-const td = require('testdouble');
-// const bar = td.replace('sheep');
+// In wallaby this also isn't being resolved (but the alias is)
+// import {tester as tester2} from './client/components/core/utils';
 
+import td from 'testdouble';
 
 describe('demo tests', () => {
-    let tester;
-
     beforeEach(() => {
-        // tester = td.replace('sheep');
-        // const foo = td.replace('x')
+        const x = td.replace('./client/components/core/utils').tester;
+
+        // Not picking up the alias so enable this to see the problem
+        // const y = td.replace('sheep');
+
+        // This isn't overwriting the 'sheep' version'
+        td.when(x()).thenReturn('foo');
     });
+
+    afterEach(() => {
+        td.reset();
+    })
 
     it('should pass', () => {
         expect(1).to.equal(1);
-
+        // This is what I would like to mock out via td
         expect(tester()).to.equal('bah');
     });
 

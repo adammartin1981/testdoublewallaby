@@ -2,8 +2,19 @@ const wallabyWebpack = require('wallaby-webpack');
 const webpackConfig = require('./webpack.config');
 const path = require('path');
 
+/*
+Also found https://github.com/wallabyjs/public/issues/469 which had the same window issue
+but now I have a cache issue appearing.
+ */
+
 module.exports = function (wallaby) {
-    // const webpackPostprocessor = wallabyWebpack(webpackConfig);
+
+    // Adding this allows replace to find the relative path - but still not the alias
+    process.env.NODE_ENV = 'testing';
+    process.env.NODE_PATH += require('path').delimiter
+        + require('path').join(wallaby.projectCacheDir);
+
+    // Just using 'mocked' webpack config to mimic the alias
     const webpackPostprocessor = wallabyWebpack({
         resolve: {
             alias: {
@@ -13,19 +24,17 @@ module.exports = function (wallaby) {
         entry: './client/index.js'
     });
 
-    // Try here
-    // https://github.com/wallabyjs/public/issues/469
+
     process.env.BABEL_ENV = 'test';
 
     return {
         files: [
-            {pattern: 'node_modules/phantomjs-polyfill/bind-polyfill.js', instrument: false},
-            {pattern: 'client/**/*.js*', load: false},
-            {pattern: 'client/**/*.spec.js*', ignore: true}
+          'client/**/*.js*',
+          '!client/**/*.spec.js*'
         ],
 
         tests: [
-            {pattern: 'client/**/*.spec.js*', load: false}
+          'client/**/*.spec.js*'
         ],
 
         compilers: {
@@ -34,38 +43,36 @@ module.exports = function (wallaby) {
 
         postprocessor: webpackPostprocessor,
 
-        setup: function () {
+        bootstrap: function () {
+          function setupWindow() {
+            const jsdom = require('jsdom')
+            const {JSDOM} = jsdom
 
-            // See if window will work
-            // const { JSDOM } = require('jsdom');
-            // const jsdom = new JSDOM('<!doctype html><html><body></body></html>');
+            const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+              url: 'https://example.com'
+            })
 
-            // const { window } = jsdom;
-            //
-            // function copyProps(src, target) {
-            //     const props = Object.getOwnPropertyNames(src)
-            //         .filter(prop => typeof target[prop] === 'undefined')
-            //         .reduce((result, prop) => ({
-            //             ...result,
-            //             [prop]: Object.getOwnPropertyDescriptor(src, prop),
-            //         }), {});
-            //     Object.defineProperties(target, props);
-            // }
-            //
-            // global.window = window;
-            // global.document = window.document;
-            // global.navigator = {
-            //     userAgent: 'node.js',
-            // };
-            // copyProps(window, global);
-            // // console.log('LOADING TESTS');
-            window.__moduleBundler.loadTests();
+            global.document = dom.window.document
+            global.window = document.defaultView
+            global.navigator = global.window.navigator
+            global.window.localStorage = {
+              getItem: () => {},
+              setItem: () => {}
+            }
+          }
+
+          // adding this allows the window issue to go away
+          // but creates a cannot read property of cache
+          setupWindow()
         },
 
         testFramework: 'mocha',
 
-        // env: {
-        //     type: 'node'
-        // }
+        env: {
+            type: 'node',
+            runner: 'node'
+        },
+
+        debug:true
     };
 };
